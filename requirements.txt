@@ -1,0 +1,14 @@
+asgiref==3.7.2
+dj-database-url==2.0.0
+Django==4.2.2
+django-jazzmin==2.6.0
+docx==0.2.4
+lxml==4.9.2
+pdfrw==0.4
+Pillow==9.5.0
+psycopg2-binary==2.9.6
+PyPDF2==3.0.1
+python-docx==0.8.11
+python-dotenv==1.0.0
+sqlparse==0.4.4
+typing_extensions==4.6.3

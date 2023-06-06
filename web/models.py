@@ -27,8 +27,8 @@ class Profile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, verbose_name="Пользователь")
     notifications = models.TextField(blank=True, verbose_name="Уведомления")
     approved = models.BooleanField(default=False, verbose_name="Одобрен")
-    personal_files = models.ManyToManyField(Document, related_name='owners', blank=True, verbose_name="Личные документы")
-    files_to_review = models.ManyToManyField(Document, related_name='reviewers', blank=True,
+    personal_files = models.ManyToManyField(Document, related_name='owner', blank=True, verbose_name="Личные документы")
+    files_to_review = models.ManyToManyField(Document, related_name='reviewer', blank=True,
                                              verbose_name="Документы для рецензирования")
 
     def __str__(self):
@@ -36,8 +36,8 @@ class Profile(models.Model):
 
     def get_statistics(self):
         deadlines_count = 0
-        personal_files = Document.objects.filter(owners__user=self.user)
-        files_to_review = Document.objects.filter(reviewers__user=self.user, status='В процессе')
+        personal_files = Document.objects.filter(owner__user=self.user)
+        files_to_review = Document.objects.filter(reviewer__user=self.user, status='В процессе')
 
         for document in files_to_review:
             deadline = date.fromisoformat(str(document.date))

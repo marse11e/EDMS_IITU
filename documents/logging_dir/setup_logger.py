@@ -1,7 +1,7 @@
 import logging
 
 
-# info_logger_setup
+# Настройка информационного логгера
 info_logger = logging.getLogger('Info_Logger')
 info_logger.setLevel(logging.INFO)
 fh_info = logging.FileHandler('good_log.log', encoding='utf-8')
@@ -10,7 +10,8 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 fh_info.setFormatter(formatter)
 info_logger.addHandler(fh_info)
 
-# error_logger_setup
+
+# Настройка логгера ошибок
 error_logger = logging.getLogger('Error_Logger')
 error_logger.setLevel(logging.ERROR)
 fh_error = logging.FileHandler('error_log.log', encoding='utf-8')

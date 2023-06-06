@@ -120,10 +120,9 @@ def notify_users(request, text, document):
         rec_notifications = str(rec.profile.notifications)
         rec_notifications += text.format(document.filename)
         rec.profile.notifications = rec_notifications
-        rec.profile.files_to_contrib.add(document)
+        rec.profile.files_to_review.add(document)
         rec.save()
     return signs_number
-
 
 def add_new_document(request):
     if request.method != 'POST':
@@ -148,6 +147,33 @@ def add_new_document(request):
     Creator.create(path_to_file=path, user_id=str(user.id), primary=True)
     return redirect('web:cabinet')
 
+def review(request, filename):
+    user = get_user(request)
+    notifications = user.profile.get_notifications()
+    personal_context = user.profile.get_statistics()
+    discussions = DiscussionText.objects.filter(document__filename=filename)
+    file = Document.objects.filter(filename=filename) \
+        .filter(Q(owner__user__username=user.username) | Q(reviewer__user__username=user.username))[0]
+    owner = file.owner.all()[0]
+    reviewer = User.objects.filter(username=user.username).filter(profile__files_to_review=file.id).count() != 0
+    path = user_directory_path(owner) + filename
+    if '/app' in path:
+        path = path.replace('/app', '.')
+    sd = Creator.create(user_id=str(user.id), path_to_file=path, primary=False)
+    if owner.id == user.id:
+        signs = [User.objects.get(id=sign_id) for sign_id in sd.who_signed()]
+    else:
+        signs = None
+    context = {'username': user.username, 'discussions': discussions,
+               'filename': filename, 'file_date': file.date,
+               'description': file.description, 'owner': owner.id == user.id,
+               'reviewer': reviewer, 'status': str(file.status),
+               'signed': sd.who_signed().count(str(user.id)) != 0, 'signs': signs,
+               'notifications': notifications}
+    context.update(personal_context)
+    return render(request, 'web/document_review.html', context)
+
+
 
 def my_404_handler(request, exception):
     context = {'errno': '404'}
@@ -167,12 +193,12 @@ def csrf_failure(request, reason=""):
 def review(request, filename):
     user = get_user(request)
     notifications = user.profile.get_notifications()
-    personal_context = user.profile.get_statistic()
+    personal_context = user.profile.get_statistics()
     discussions = DiscussionText.objects.filter(document__filename=filename)
     file = Document.objects.filter(filename=filename) \
         .filter(Q(owner__user__username=user.username) | Q(reviewer__user__username=user.username))[0]
     owner = file.owner.all()[0]
-    reviewer = User.objects.filter(username=user.username).filter(profile__files_to_contrib=file.id).count() != 0
+    reviewer = User.objects.filter(username=user.username).filter(profile__files_to_review=file.id).count() != 0
     path = user_directory_path(owner) + filename
     if '/app' in path:
         path = path.replace('/app', '.')
@@ -249,7 +275,7 @@ def search(request):
     user = get_user(request)
     notifications = user.profile.get_notifications()
     text = request.POST.get('text')
-    personal_context = user.profile.get_statistic()
+    personal_context = user.profile.get_statistics()
     files_found = [Document.objects.filter(filename=text + ext).filter(Q(owner__user__username=user.username) |
                                                                        Q(reviewer__user__username=user.username))
                    for ext in extensions]
@@ -263,7 +289,7 @@ def edit_document(request, filename):
     notifications = user.profile.get_notifications()
     file = Document.objects.filter(filename=filename). \
         filter(Q(owner__user__username=user.username) | Q(reviewer__user__username=user.username))[0]
-    recipients = User.objects.filter(profile__files_to_contrib=file.id)
+    recipients = User.objects.filter(profile__files_to_review=file.id)
     recipient_names = list()
     persons = user.profile.get_group_persons()
     for rec in recipients:

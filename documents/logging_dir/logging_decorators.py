@@ -6,10 +6,10 @@ def init_logger(func):
         try:
             func(self, user_id, path, primary)
         except ValueError as error:
-            error_logger.error(f'Error: {str(error)} occurred with file: {path}')
+            error_logger.error(f'Ошибка: {str(error)}, произошла с файлом: {path}')
         else:
             if primary:
-                info_logger.info(f'File {path} was initiated')
+                info_logger.info(f'Файл {path} был инициализирован')
     return wrapper
 
 
@@ -18,7 +18,7 @@ def sign_logger(func):
         try:
             func(self)
         except ValueError as error:
-            error_logger.error(f'Error: {str(error)} occurred with file: {self.path}')
+            error_logger.error(f'Ошибка: {str(error)}, произошла с файлом: {self.path}')
         else:
-            info_logger.info(f'File {self.path} was signed by user {self.user_id}')
+            info_logger.info(f'Файл {self.path} был подписан пользователем {self.user_id}')
     return wrapper

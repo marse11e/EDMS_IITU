@@ -17,6 +17,10 @@ class Document(models.Model):
 
     def __str__(self):
         return self.filename
+    
+    class Meta:
+        verbose_name = "Документ"
+        verbose_name_plural = "Докменты"
 
 
 class Profile(models.Model):
@@ -72,6 +76,10 @@ class Profile(models.Model):
         if password:
             self.user.set_password(password)
         self.user.save()
+    
+    class Meta:
+        verbose_name = "Профиль"
+        verbose_name_plural = "Профили"
 
 
 class DiscussionText(models.Model):
@@ -80,6 +88,9 @@ class DiscussionText(models.Model):
     publish_date = models.DateField(verbose_name="Дата публикации")
     document = models.ForeignKey(Document, on_delete=models.CASCADE, null=True, verbose_name="Документ")
 
+    class Meta:
+        verbose_name = "Тема диалока"
+        verbose_name_plural = "Темы диалока"
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):

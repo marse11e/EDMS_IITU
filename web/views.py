@@ -239,7 +239,7 @@ def update_account(request):
 def show_documents(request):
     user = get_user(request)
     notifications = user.profile.get_notifications()
-    personal_context = user.profile.get_statistic()
+    personal_context = user.profile.get_statistics()
     context = {'username': user.username, 'notifications': notifications}
     context.update(personal_context)
     return render(request, 'web/tables.html', context=context)

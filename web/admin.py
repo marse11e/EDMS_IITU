@@ -6,8 +6,8 @@ from .models import Document, Profile, DiscussionText
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ('filename', 'date', 'status')
-    list_filter = ('status',)
+    list_display = ('filename', 'date', 'status', "signs_number")
+    list_filter = ('status', 'signed')
     search_fields = ('filename', 'status')
 
 

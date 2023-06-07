@@ -37,10 +37,10 @@ def log_in(request):
         password = request.POST.get('password', '')
         user = authenticate(username=username, password=password)
         if user is not None:
-            # if not user.profile.approved:
-            #     context = {'text': 'Пожалуйста, подождите,'
-            #                        ' пока администратор группы подтвердит Ваш аккаунт'}
-            #     return render(request, 'web/errors.html', context)
+            if not user.profile.approved:
+                context = {'text': 'Пожалуйста, подождите,'
+                                   ' пока администратор группы подтвердит Ваш аккаунт'}
+                return render(request, 'web/errors.html', context)
             login(request, user)
         else:
             context = {'text': 'Неверный логин или пароль'}
@@ -114,15 +114,14 @@ def notify_users(request, text, document):
         if str(recipient) == 'Выберите пользователя':
             continue
         signs_number += 1
-        # Добавить получателям файл в список файлов на подписание
         rec = User.objects.get(username=recipient)
-        # Вписываем уведомления пользователя
         rec_notifications = str(rec.profile.notifications)
         rec_notifications += text.format(document.filename)
         rec.profile.notifications = rec_notifications
         rec.profile.files_to_review.add(document)
         rec.save()
     return signs_number
+
 
 def add_new_document(request):
     if request.method != 'POST':
@@ -143,36 +142,8 @@ def add_new_document(request):
     d.signed = 0
     d.save()
     handle_uploaded_file(user, request.FILES.get('file'), filename)
-    # setup file in order to lately use it
     Creator.create(path_to_file=path, user_id=str(user.id), primary=True)
     return redirect('web:cabinet')
-
-def review(request, filename):
-    user = get_user(request)
-    notifications = user.profile.get_notifications()
-    personal_context = user.profile.get_statistics()
-    discussions = DiscussionText.objects.filter(document__filename=filename)
-    file = Document.objects.filter(filename=filename) \
-        .filter(Q(owner__user__username=user.username) | Q(reviewer__user__username=user.username))[0]
-    owner = file.owner.all()[0]
-    reviewer = User.objects.filter(username=user.username).filter(profile__files_to_review=file.id).count() != 0
-    path = user_directory_path(owner) + filename
-    if '/app' in path:
-        path = path.replace('/app', '.')
-    sd = Creator.create(user_id=str(user.id), path_to_file=path, primary=False)
-    if owner.id == user.id:
-        signs = [User.objects.get(id=sign_id) for sign_id in sd.who_signed()]
-    else:
-        signs = None
-    context = {'username': user.username, 'discussions': discussions,
-               'filename': filename, 'file_date': file.date,
-               'description': file.description, 'owner': owner.id == user.id,
-               'reviewer': reviewer, 'status': str(file.status),
-               'signed': sd.who_signed().count(str(user.id)) != 0, 'signs': signs,
-               'notifications': notifications}
-    context.update(personal_context)
-    return render(request, 'web/document_review.html', context)
-
 
 
 def my_404_handler(request, exception):
@@ -190,30 +161,49 @@ def csrf_failure(request, reason=""):
     return render(request, 'web/errors.html', context)
 
 
+from django.http import HttpResponse
+
 def review(request, filename):
     user = get_user(request)
-    notifications = user.profile.get_notifications()
-    personal_context = user.profile.get_statistics()
-    discussions = DiscussionText.objects.filter(document__filename=filename)
-    file = Document.objects.filter(filename=filename) \
-        .filter(Q(owner__user__username=user.username) | Q(reviewer__user__username=user.username))[0]
-    owner = file.owner.all()[0]
-    reviewer = User.objects.filter(username=user.username).filter(profile__files_to_review=file.id).count() != 0
+    file = Document.objects.filter(filename=filename).first()
+    
+    if not file:
+        # Обработка случая, когда файл не найден
+        return HttpResponse("<h1>Файл не найден</h1>", status=404)
+    
+    print(file.owner.first())
+    owner = file.owner.first()
+    reviewer = User.objects.filter(username=user.username, profile__files_to_review=file.id).exists()
+    
     path = user_directory_path(owner) + filename
     if '/app' in path:
         path = path.replace('/app', '.')
+    
     sd = Creator.create(user_id=str(user.id), path_to_file=path, primary=False)
-    if owner.id == user.id:
+    
+    signs = None
+    if owner == user:
         signs = [User.objects.get(id=sign_id) for sign_id in sd.who_signed()]
-    else:
-        signs = None
-    context = {'username': user.username, 'discussions': discussions,
-               'filename': filename, 'file_date': file.date,
-               'description': file.description, 'owner': owner.id == user.id,
-               'reviewer': reviewer, 'status': str(file.status),
-               'signed': sd.who_signed().count(str(user.id)) != 0, 'signs': signs,
-               'notifications': notifications}
+    
+    discussions = DiscussionText.objects.filter(document__filename=filename)
+    notifications = user.profile.get_notifications()
+    personal_context = user.profile.get_statistics()
+    
+    context = {
+        'username': user.username,
+        'discussions': discussions,
+        'filename': filename,
+        'file_date': file.date,
+        'description': file.description,
+        'owner': owner == user,
+        'reviewer': reviewer,
+        'status': str(file.status),
+        'signed': str(user.id) in sd.who_signed(),
+        'signs': signs,
+        'notifications': notifications,
+    }
     context.update(personal_context)
+    
     return render(request, 'web/document_review.html', context)
 
 
@@ -283,21 +273,26 @@ def search(request):
     context.update(personal_context)
     return render(request, 'web/search.html', context=context)
 
-
 def edit_document(request, filename):
     user = get_user(request)
     notifications = user.profile.get_notifications()
     file = Document.objects.filter(filename=filename). \
         filter(Q(owner__user__username=user.username) | Q(reviewer__user__username=user.username))[0]
     recipients = User.objects.filter(profile__files_to_review=file.id)
-    recipient_names = list()
+    recipient_names = []
     persons = user.profile.get_group_persons()
     for rec in recipients:
         recipient_names.append(rec.username)
-        persons.remove(rec.username)
-    context = {'username': user.username, 'notifications': notifications, 'persons': persons,
-               'filename': filename, 'recipients': recipient_names,
-               'deadline': str(file.date)}
+        if rec.username in persons:
+            persons.remove(rec.username)
+    context = {
+        'username': user.username,
+        'notifications': notifications,
+        'persons': persons,
+        'filename': filename,
+        'recipients': recipient_names,
+        'deadline': str(file.date)
+    }
     return render(request, 'web/edit-document.html', context)
 
 
